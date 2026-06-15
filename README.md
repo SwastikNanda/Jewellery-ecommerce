@@ -104,7 +104,9 @@ This repo includes a [`render.yaml`](./render.yaml) Blueprint that provisions th
    - `NEXT_PUBLIC_APP_URL` → your Render URL (e.g. `https://aurelle-web.onrender.com`)
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
    `DATABASE_URL` and `AUTH_SECRET` are wired up automatically.
-4. The build runs `prisma migrate deploy` to create tables. Then seed once from the service **Shell**:
+4. The build automatically runs `prisma migrate deploy` (creates tables) **and** `npm run db:seed`
+   (loads the 24-piece demo catalogue + demo accounts). The seed is idempotent, so re-deploys
+   won't duplicate data. To re-seed manually, open the service **Shell** and run:
    ```bash
    npm run db:seed
    ```
@@ -114,7 +116,7 @@ This repo includes a [`render.yaml`](./render.yaml) Blueprint that provisions th
 
 - **Database:** create a Render PostgreSQL instance, copy its **Internal/External Database URL**.
 - **Web Service:** New → Web Service from the repo.
-  - Build: `npm install && npx prisma migrate deploy && npm run build`
+  - Build: `npm install && npx prisma migrate deploy && npm run db:seed && npm run build`
   - Start: `npm run start`
   - Env vars: `DATABASE_URL`, `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
 
@@ -130,6 +132,7 @@ This repo includes a [`render.yaml`](./render.yaml) Blueprint that provisions th
 | `npm run lint`      | ESLint                               |
 | `npm run db:push`   | Sync schema to the database          |
 | `npm run db:deploy` | Apply migrations (`migrate deploy`)  |
+| `npm run db:setup`  | Migrate **and** seed in one step      |
 | `npm run db:seed`   | Seed demo catalogue + accounts       |
 | `npm run db:studio` | Open Prisma Studio                   |
 
@@ -151,6 +154,21 @@ src/
   components/           # ui, layout, product, admin, providers
   lib/                  # prisma, auth, stripe, products, cart, orders, utils, validations
 ```
+
+## 🛠️ Troubleshooting
+
+**"The catalogue is empty. Run `npm run db:seed`…"**
+This means the database has no products yet — either `DATABASE_URL` isn't pointing at a real
+Postgres, or the seed hasn't run. Fix it with:
+
+```bash
+npm run db:setup    # applies migrations + seeds the 24-piece demo catalogue
+```
+
+Make sure `DATABASE_URL` in `.env` (local) or the Render dashboard (deployed) points at a
+reachable Postgres. On Render the Blueprint seeds automatically during build.
+
+---
 
 ## 🔒 Notes on images
 
