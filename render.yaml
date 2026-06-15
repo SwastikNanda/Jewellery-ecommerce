@@ -1,0 +1,35 @@
+# Render Blueprint — Aurelle Jewellery
+# Provisions a Next.js web service + a managed PostgreSQL database.
+# Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: aurelle-db
+    plan: free
+    databaseName: aurelle
+    user: aurelle
+
+services:
+  - type: web
+    name: aurelle-web
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install && npx prisma migrate deploy && npm run build
+    startCommand: npm run start
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aurelle-db
+          property: connectionString
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false # set to your Render URL, e.g. https://aurelle-web.onrender.com
+      - key: STRIPE_SECRET_KEY
+        sync: false # paste your Stripe test secret key
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false # paste the webhook signing secret from Stripe
+      - key: NODE_VERSION
+        value: "20"

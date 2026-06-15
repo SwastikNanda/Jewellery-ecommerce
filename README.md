@@ -1,36 +1,157 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Aurelle · Fine Jewellery E‑Commerce
 
-## Getting Started
+A production‑ready, full‑stack jewellery store built with **Next.js (App Router)**, **TypeScript**, **Tailwind CSS**, **Prisma + PostgreSQL** and **Stripe**. Aesthetic, modern and minimal with subtle champagne/ivory tones.
 
-First, run the development server:
+## ✨ Features
+
+- **Landing page** — hero, shop‑by‑category, featured pieces, editorial banners, new arrivals.
+- **Collections** — Wedding, Vintage, Modern, Aesthetic.
+- **Catalogue** — search, filter by collection / type, sort by price, responsive product grid.
+- **Product pages** — image gallery, quantity selector, **Add to cart** & **Buy now**.
+- **Authentication** — email/password sign‑up & login. Secure, hashed passwords (bcrypt) + signed **HTTP‑only JWT** sessions (jose). Role‑based access (`USER` / `ADMIN`).
+- **Cart & checkout** — server‑persisted cart, login‑gated **Stripe Checkout** (test mode) with webhook order fulfilment. Falls back to a simulated payment if Stripe keys aren’t set, so it runs out of the box.
+- **Account dashboard** — order history & wishlist.
+- **Admin panel** (`/admin`) — dashboard stats, product CRUD (set price, stock, images, collection, feature flag) and order management.
+- **Data safety** — server‑side authorization on every admin/order route, Zod validation, parameterized Prisma access, secrets only in env.
+
+## 🧱 Tech stack
+
+| Layer        | Choice                                   |
+| ------------ | ---------------------------------------- |
+| Framework    | Next.js 16 (App Router) + React 19       |
+| Styling      | Tailwind CSS v4                          |
+| Database     | PostgreSQL via Prisma ORM                |
+| Auth         | bcryptjs + jose (JWT in HTTP‑only cookie)|
+| Payments     | Stripe Checkout (test mode)              |
+| Validation   | Zod                                      |
+| Hosting      | Render (web service + Render Postgres)   |
+
+---
+
+## 🚀 Local development
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment
+
+Copy the example file and fill in values:
+
+```bash
+cp .env.example .env
+```
+
+| Variable                | Required | Notes                                                         |
+| ----------------------- | -------- | ------------------------------------------------------------- |
+| `DATABASE_URL`          | ✅       | PostgreSQL connection string.                                 |
+| `AUTH_SECRET`           | ✅       | Long random string. Generate: `openssl rand -base64 32`.      |
+| `NEXT_PUBLIC_APP_URL`   | ✅       | e.g. `http://localhost:3000`.                                 |
+| `STRIPE_SECRET_KEY`     | optional | Stripe **test** secret key. Omit to use simulated checkout.   |
+| `STRIPE_WEBHOOK_SECRET` | optional | Webhook signing secret (see below).                           |
+| `SEED_ADMIN_EMAIL`      | optional | Admin account created by the seed (default `admin@aurelle.com`). |
+| `SEED_ADMIN_PASSWORD`   | optional | Admin password (default `Admin@123`).                         |
+
+> **Need a database?** Use a free [Render](https://render.com) or [Neon](https://neon.tech) Postgres and paste its connection string into `DATABASE_URL`.
+
+### 3. Create the schema & seed demo data
+
+```bash
+npm run db:push     # or: npx prisma migrate deploy
+npm run db:seed     # loads 24 demo products + admin & customer accounts
+```
+
+### 4. Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open <http://localhost:3000>.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Demo logins (after seeding):**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Admin — `admin@aurelle.com` / `Admin@123` → `/admin`
+- Customer — `customer@aurelle.com` / `Customer@123`
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 💳 Stripe (test mode)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Get your **test** secret key from <https://dashboard.stripe.com/test/apikeys> → set `STRIPE_SECRET_KEY`.
+2. Forward webhooks locally:
+   ```bash
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
+   ```
+   Copy the printed `whsec_…` into `STRIPE_WEBHOOK_SECRET`.
+3. Pay with test card `4242 4242 4242 4242`, any future expiry & CVC.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If Stripe keys are absent, checkout is **simulated** (order is marked paid immediately) so you can demo the full flow without configuration.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ☁️ Deploy to Render
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This repo includes a [`render.yaml`](./render.yaml) Blueprint that provisions the web service **and** a managed Postgres database.
+
+### Option A — Blueprint (recommended)
+
+1. Push this repo to GitHub.
+2. In Render: **New → Blueprint**, select the repo. Render reads `render.yaml`.
+3. After it provisions, set the `sync: false` env vars in the dashboard:
+   - `NEXT_PUBLIC_APP_URL` → your Render URL (e.g. `https://aurelle-web.onrender.com`)
+   - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+   `DATABASE_URL` and `AUTH_SECRET` are wired up automatically.
+4. The build runs `prisma migrate deploy` to create tables. Then seed once from the service **Shell**:
+   ```bash
+   npm run db:seed
+   ```
+5. Add the Stripe webhook endpoint `https://<your-app>.onrender.com/api/webhooks/stripe` in the Stripe dashboard and paste its signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+### Option B — Manual
+
+- **Database:** create a Render PostgreSQL instance, copy its **Internal/External Database URL**.
+- **Web Service:** New → Web Service from the repo.
+  - Build: `npm install && npx prisma migrate deploy && npm run build`
+  - Start: `npm run start`
+  - Env vars: `DATABASE_URL`, `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
+
+---
+
+## 📜 Scripts
+
+| Script              | Description                          |
+| ------------------- | ------------------------------------ |
+| `npm run dev`       | Start dev server                     |
+| `npm run build`     | Generate Prisma client + production build |
+| `npm run start`     | Start production server              |
+| `npm run lint`      | ESLint                               |
+| `npm run db:push`   | Sync schema to the database          |
+| `npm run db:deploy` | Apply migrations (`migrate deploy`)  |
+| `npm run db:seed`   | Seed demo catalogue + accounts       |
+| `npm run db:studio` | Open Prisma Studio                   |
+
+---
+
+## 🗂️ Project structure
+
+```
+prisma/
+  schema.prisma         # data model
+  migrations/0_init     # initial migration
+  seed.ts               # demo data
+src/
+  app/
+    (shop)/             # storefront (navbar + footer): home, shop, category, product, cart, checkout, account
+    login/ register/    # auth screens
+    admin/              # admin dashboard, products, orders (ADMIN only)
+    api/                # auth, cart, checkout, webhooks, admin, wishlist
+  components/           # ui, layout, product, admin, providers
+  lib/                  # prisma, auth, stripe, products, cart, orders, utils, validations
+```
+
+## 🔒 Notes on images
+
+Demo images are served from Pexels (free licence). Admins add products with hosted image URLs (any CDN, Cloudinary, or Vercel Blob). Allowed image hosts are configured in `next.config.ts`.
